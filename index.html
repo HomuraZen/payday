@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Payday</title>
+<meta name="description" content="A private salary and budget planner. Your figures stay on this device.">
+<meta name="theme-color" content="#1a1a1a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Payday">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="screen" id="setup" hidden>
+  <div class="setup-in">
+    <h1>Payday</h1>
+    <p class="sub">Load your plan to start. It stays on this device and is never uploaded.</p>
+    <label class="btn file" for="setupFile">Choose setup file</label>
+    <input id="setupFile" type="file" accept=".json,application/json,text/plain" hidden>
+    <details>
+      <summary>Paste it instead</summary>
+      <textarea id="setupText" rows="6" aria-label="Setup text"></textarea>
+      <button class="btn ghost" type="button" id="setupPaste">Load plan</button>
+    </details>
+    <p class="err" id="setupErr" role="alert" hidden></p>
+  </div>
+</div>
+
+<div id="app" hidden>
+  <main class="screen">
+    <section class="tab" id="t-home">
+      <header class="bar"><h1>Payday</h1><span class="small muted" id="toPay"></span></header>
+      <div class="hero">
+        <span class="label" id="dayLabel">Safe to spend today</span>
+        <span class="big" id="daySafe"></span>
+        <span class="small sub" id="dayBody"></span>
+        <span class="pill" id="saveErr" hidden>! This phone couldn't save your last change. Free up storage, then try again.</span>
+      </div>
+      <div class="stats">
+        <button type="button" class="stat" data-go="spend"><span class="label">Left this month</span><b id="sLeft"></b></button>
+        <button type="button" class="stat" data-go="fund"><span class="label">Emergency fund</span><b id="sFund"></b></button>
+      </div>
+      <div class="next due" id="dueNote" hidden><b id="dueT"></b><span class="small sub">Scroll down and press Start when the money is in your account.</span></div>
+      <section>
+        <div class="head"><h2>Money moves</h2><span class="small muted" id="movesP"></span></div>
+        <div class="moves" id="moves"></div>
+      </section>
+      <section class="next" id="next">
+        <h3 id="nextT"></h3>
+        <p class="small sub">Do this when your salary lands. It adds this month's savings to your fund, clears the moves and spending, and loads your Every month budget.</p>
+        <label class="check" id="leftWrap"><input type="checkbox" id="addLeft"><span id="addLeftT"></span></label>
+        <div class="ctl">
+          <label class="money" for="nextSal"><span>RM</span><input id="nextSal" type="number" inputmode="decimal" min="0" step="0.01" aria-label="Salary received"></label>
+          <button class="btn ghost" type="button" id="nextBtn"></button>
+          <button class="btn" type="button" id="nextYes" hidden>Yes, start it</button>
+          <button class="text-btn" type="button" id="nextNo" hidden>Cancel</button>
+        </div>
+      </section>
+    </section>
+
+    <section class="tab" id="t-spend" hidden>
+      <header class="bar"><h1>Spending</h1><span class="small muted" id="spendS"></span></header>
+      <div class="cats" id="cats"></div>
+      <section>
+        <h2>This month</h2>
+        <div id="log"></div>
+      </section>
+    </section>
+
+    <section class="tab" id="t-plan" hidden>
+      <header class="bar"><h1>Plan</h1>
+        <div class="seg">
+          <button type="button" id="vNow" data-v="now">This month</button>
+          <button type="button" id="vMonth" data-v="month">Every month</button>
+        </div>
+      </header>
+      <div class="hero">
+        <div class="hero-nums">
+          <div><span class="label" id="potL"></span><span class="mid" id="pot"></span><span class="small sub" id="potS"></span></div>
+          <div><span class="label">Fund gets</span><span class="mid" id="sav"></span></div>
+        </div>
+        <span class="pill" id="over" hidden></span>
+        <div class="stack" id="stack" aria-hidden="true"></div>
+        <div class="legend" id="legend"></div>
+      </div>
+      <section id="payMoves" hidden>
+        <h2>What to move each payday</h2>
+        <div class="moves" id="moves2"></div>
+      </section>
+      <section>
+        <div class="head"><h2>Budget by bank</h2><span class="small muted" id="budgetS"></span></div>
+        <label class="money salw" id="salWrap" hidden><span>Monthly salary RM</span><input id="salary" type="number" inputmode="decimal" min="0" step="0.01"></label>
+        <div class="groups" id="groups"></div>
+        <div class="saveline"><span>Left for the emergency fund</span><span id="saveTotal"></span></div>
+      </section>
+    </section>
+
+    <section class="tab" id="t-fund" hidden>
+      <header class="bar"><h1>Emergency fund</h1></header>
+      <div class="fund-top">
+        <div class="hero"><span class="label" id="fundL"></span><span class="big" id="fund"></span></div>
+        <label class="stackl"><span class="small muted">Correct the balance</span>
+          <span class="money"><span>RM</span><input id="fundEdit" type="number" inputmode="decimal" min="0" step="0.01"></span></label>
+      </div>
+      <div class="chart" id="chart"><div class="tip" id="tip" hidden></div></div>
+      <p class="small muted" id="fundS"></p>
+      <ul class="miles" id="miles"></ul>
+      <details><summary>Show the projection as a table</summary><div class="tablewrap" id="ptable"></div></details>
+    </section>
+
+    <section class="tab" id="t-banks" hidden>
+      <header class="bar"><h1>Banks</h1></header>
+      <div class="banks" id="banks"></div>
+      <p class="small muted" id="bankNote"></p>
+      <section class="next">
+        <h3>Backup</h3>
+        <p class="small sub">Your plan lives only on this device. If you delete the app or change phones, it goes too, so save a backup each payday. <span id="lastBackup"></span></p>
+        <div class="ctl">
+          <button class="btn ghost" type="button" id="bkSave">Save backup</button>
+          <button class="btn ghost" type="button" id="bkCopy">Copy backup</button>
+          <label class="btn ghost file" for="bkFile">Restore</label>
+          <input id="bkFile" type="file" accept=".json,application/json,text/plain" hidden>
+        </div>
+        <p class="small" id="bkMsg" role="status"></p>
+      </section>
+    </section>
+  </main>
+
+  <button type="button" class="fab" id="fab" aria-label="Add spending">+</button>
+  <nav class="tabs" aria-label="Main">
+    <button type="button" data-go="home">Home</button>
+    <button type="button" data-go="spend">Spending</button>
+    <button type="button" data-go="plan">Plan</button>
+    <button type="button" data-go="fund">Fund</button>
+    <button type="button" data-go="banks">Banks</button>
+  </nav>
+
+  <dialog id="sheet" aria-labelledby="sheetT">
+    <form id="addForm" method="dialog">
+      <div class="head"><h2 id="sheetT">Add spending</h2><button type="button" class="text-btn" id="sheetX">Close</button></div>
+      <label class="amount"><span>RM</span><input id="exAmt" type="number" inputmode="decimal" min="0.01" step="0.01" required aria-label="Amount"></label>
+      <div class="chips" id="chips" role="radiogroup" aria-label="Category"></div>
+      <input id="exNote" type="text" class="txt" placeholder="Note (optional)" aria-label="Note" maxlength="80">
+      <button class="btn big-btn" type="submit" id="exSave">Save</button>
+      <p class="err" id="exErr" role="alert" hidden>Choose a category first.</p>
+    </form>
+  </dialog>
+</div>
+<script src="app.js"></script>
+</body>
+</html>
