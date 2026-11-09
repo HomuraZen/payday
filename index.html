@@ -131,7 +131,7 @@
     </section>
   </main>
 
-  <button type="button" class="fab" id="fab" aria-label="Add spending">+</button>
+  <button type="button" class="fab" id="fab" aria-label="Add spending or money in">+</button>
   <nav class="tabs" aria-label="Main">
     <button type="button" data-go="home">Home</button>
     <button type="button" data-go="spend">Spending</button>
@@ -143,8 +143,15 @@
   <dialog id="sheet" aria-labelledby="sheetT">
     <form id="addForm" method="dialog">
       <div class="head"><h2 id="sheetT">Add spending</h2><button type="button" class="text-btn" id="sheetX">Close</button></div>
+      <div class="seg full">
+        <button type="button" id="mSpend" data-mode="spend">Spent</button>
+        <button type="button" id="mIn" data-mode="in">Money in</button>
+      </div>
       <label class="amount"><span>RM</span><input id="exAmt" type="number" inputmode="decimal" min="0.01" step="0.01" required aria-label="Amount"></label>
-      <div class="chips" id="chips" role="radiogroup" aria-label="Category"></div>
+      <div class="chips" id="kinds" role="radiogroup" aria-label="Kind of money" hidden></div>
+      <p class="small sub" id="inHint" hidden></p>
+      <span class="label" id="chipsL">Category</span>
+      <div class="chips" id="chips" role="radiogroup" aria-labelledby="chipsL"></div>
       <input id="exNote" type="text" class="txt" placeholder="Note (optional)" aria-label="Note" maxlength="80">
       <button class="btn big-btn" type="submit" id="exSave">Save</button>
       <p class="err" id="exErr" role="alert" hidden>Choose a category first.</p>

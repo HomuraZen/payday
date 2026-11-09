@@ -1,4 +1,4 @@
-var CACHE = 'payday-v1';
+var CACHE = 'payday-v2';
 var FILES = ['./', 'index.html', 'styles.css', 'app.js', 'manifest.webmanifest',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png',
   'fonts/bricolage-grotesque-latin-700-normal.woff2',

@@ -147,6 +147,9 @@ dialog::backdrop { background: #0009; }
 .chip { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--line); background: var(--raised); border-radius: 999px; padding: 7px 12px; min-height: 40px; font-size: 14px; }
 .chip[aria-checked="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
 .err { color: var(--bad); font-size: 14px; }
+.seg.full { display: grid; grid-template-columns: 1fr 1fr; }
+.entry .amt.in { color: var(--good); }
+#addForm .label { margin-bottom: -6px; }
 
 .setup-in { display: grid; gap: 14px; padding-top: 12vh; }
 textarea { width: 100%; background: var(--raised); border: 1px solid var(--line); border-radius: 8px; padding: 10px; font-size: 16px; margin-bottom: 8px; }

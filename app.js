@@ -4,7 +4,13 @@
   var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   var LONG = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
   var COLORS = { save: 'var(--c-save)', bills: 'var(--c-bills)', daily: 'var(--c-daily)', funds: 'var(--c-funds)', idle: 'var(--c-idle)' };
-  var state = null, view = 'now', tab = 'home', adding = null, confirming = false, chosen = null;
+  var state = null, view = 'now', tab = 'home', adding = null, confirming = false, chosen = null, mode = 'spend', kind = null;
+  var KINDS = [
+    { id: 'extra', name: 'Extra income', to: 'fund', hint: 'Money outside your salary plan goes to the emergency fund by default. Move it to your savings account after you save this.' },
+    { id: 'claim', name: 'Claim', to: null, hint: 'If it pays back spending you logged here, put it back in that budget item. If you paid for work items with your own money and never logged them, choose No budget change.' },
+    { id: 'friend', name: 'Friend transfer', to: null, hint: 'If a friend is paying you back, put it back where the money came from. If it\'s a gift, the emergency fund is the safe choice.' }
+  ];
+  function kindName(id) { var k = KINDS.filter(function (x) { return x.id === id; })[0]; return k ? k.name : 'Money in'; }
 
   function $(id) { return document.getElementById(id); }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
@@ -47,14 +53,24 @@
   }
   function spentOn(id) { var s = 0; state.expenses.forEach(function (e) { if (e.item === id) s += e.amt; }); return r2(s); }
   function totalSpent() { var s = 0; state.expenses.forEach(function (e) { s += e.amt; }); return r2(s); }
-  function fundNow() { return r2(state.fundBase + (state.moves.fund ? Math.max(0, calc('now').savings) : 0)); }
+  function incomeTo(id) { var s = 0; state.income.forEach(function (e) { if (e.to === id) s += e.amt; }); return r2(s); }
+  function incomeTotal() { var s = 0; state.income.forEach(function (e) { s += e.amt; }); return r2(s); }
+  function itemTopUps() { var s = 0; state.income.forEach(function (e) { if (e.to !== 'fund' && e.to !== 'none') s += e.amt; }); return r2(s); }
+  function effBudget(it) { return r2((it.now || 0) + incomeTo(it.id)); }
+  function destName(to) {
+    if (to === 'fund') return 'Emergency fund';
+    if (to === 'none') return 'No budget change';
+    var it = state.items.filter(function (i) { return i.id === to; })[0];
+    return it ? it.name : 'Removed item';
+  }
+  function fundNow() { return r2(state.fundBase + (state.moves.fund ? Math.max(0, calc('now').savings) : 0) + incomeTo('fund')); }
   function unspentDaily() {
     var s = 0;
-    state.items.forEach(function (it) { if (it.acct === 'daily') s += Math.max(0, (it.now || 0) - spentOn(it.id)); });
+    state.items.forEach(function (it) { if (it.acct === 'daily') s += Math.max(0, effBudget(it) - spentOn(it.id)); });
     return r2(s);
   }
   function project() {
-    var bal = r2(state.fundBase + Math.max(0, calc('now').savings)), k = state.cycle.key, out = [{ key: k, val: bal, now: true }];
+    var bal = r2(state.fundBase + Math.max(0, calc('now').savings) + incomeTo('fund')), k = state.cycle.key, out = [{ key: k, val: bal, now: true }];
     for (var i = 0; i < 11; i++) {
       k = nextKey(k);
       var sp = 0;
@@ -82,7 +98,7 @@
     return d && d.cycle && d.cycle.nextPayISO && d.cycle.key && Array.isArray(d.items) && Array.isArray(d.accounts) && typeof d.salary === 'number';
   }
   function adopt(d) {
-    d.expenses = d.expenses || []; d.moves = d.moves || {}; d.history = d.history || [];
+    d.expenses = d.expenses || []; d.income = d.income || []; d.moves = d.moves || {}; d.history = d.history || [];
     d.fundBase = d.fundBase || 0;
     state = d; save(); show();
     if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(function () {});
@@ -96,7 +112,7 @@
   function perDayItems() { return state.items.filter(function (it) { return it.perDay; }); }
   function renderHome() {
     var cy = state.cycle, left = daysLeft(), items = perDayItems(), bud = 0, sp = 0, todaySp = 0, today = todayISO();
-    items.forEach(function (it) { bud += it.now || 0; sp += spentOn(it.id); });
+    items.forEach(function (it) { bud += effBudget(it); sp += spentOn(it.id); });
     state.expenses.forEach(function (e) {
       if (e.date === today && items.some(function (i) { return i.id === e.item; })) todaySp += e.amt;
     });
@@ -105,7 +121,7 @@
     $('daySafe').textContent = rm(Math.max(0, safe));
     $('dayBody').textContent = (safe < 0 ? rm(-safe) + ' over today\'s share. ' : '') + rm(rest) + ' left for ' + items.map(function (i) { return i.name.toLowerCase(); }).join(' and ') + ' until ' + cy.nextPay + '.';
     var all = calc('now');
-    $('sLeft').textContent = rm(all.spend - totalSpent());
+    $('sLeft').textContent = rm(all.spend + itemTopUps() - totalSpent());
     $('sFund').textContent = rm(fundNow());
 
     var ml = moveList('now', all), done = ml.filter(function (m) { return state.moves[m.id]; }).length;
@@ -149,23 +165,32 @@
   /* Spending */
   function renderSpend() {
     var total = calc('now').spend, spent = totalSpent();
-    $('spendS').textContent = rm(spent) + ' of ' + rm(total);
+    var inn = incomeTotal();
+    $('spendS').textContent = rm(spent) + ' of ' + rm(total + itemTopUps()) + (inn > 0 ? ' · ' + rm(inn) + ' in' : '');
     var html = '';
     budgetAccts().forEach(function (a) {
       state.items.filter(function (it) { return it.acct === a.id && !it.paid; }).forEach(function (it) {
-        var b = it.now || 0, s = spentOn(it.id), left = r2(b - s), pct = b > 0 ? Math.min(100, s / b * 100) : (s > 0 ? 100 : 0);
-        html += '<div class="cat"><div class="r"><span>' + esc(it.name) + '</span><b class="' + (left < 0 ? 'o' : '') + '">' + (left < 0 ? rm(-left) + ' over' : rm(left) + ' left') + '</b></div>'
+        var b = effBudget(it), s = spentOn(it.id), left = r2(b - s), pct = b > 0 ? Math.min(100, s / b * 100) : (s > 0 ? 100 : 0), top = incomeTo(it.id);
+        html += '<div class="cat"><div class="r"><span>' + esc(it.name) + (top > 0 ? ' <span class="tag">+' + rm(top) + ' added</span>' : '') + '</span><b class="' + (left < 0 ? 'o' : '') + '">' + (left < 0 ? rm(-left) + ' over' : rm(left) + ' left') + '</b></div>'
           + '<div class="track"><i style="width:' + pct + '%;background:' + (left < 0 ? 'var(--bad)' : color(a)) + '"></i></div></div>';
       });
     });
     $('cats').innerHTML = html;
-    var ex = state.expenses.slice().sort(function (x, y) { return y.ts - x.ts; }), last = null, out = '';
-    ex.forEach(function (e) {
+    var rows = state.expenses.map(function (e) { return { e: e, inn: false }; }).concat(state.income.map(function (e) { return { e: e, inn: true }; }));
+    rows.sort(function (x, y) { return y.e.ts - x.e.ts; });
+    var last = null, out = '';
+    rows.forEach(function (r) {
+      var e = r.e;
       if (e.date !== last) { out += '<div class="day">' + esc(dayName(e.date)) + '</div>'; last = e.date; }
+      if (r.inn) {
+        var sub = 'To ' + destName(e.to) + (e.note ? ' · ' + e.note : '');
+        out += '<div class="entry"><span class="t"><span>' + esc(kindName(e.kind)) + '</span><span class="small muted">' + esc(sub) + '</span></span><span class="amt in">+' + rm(e.amt) + '</span><button type="button" class="x" data-in="' + esc(e.id) + '" aria-label="Delete ' + esc(rm(e.amt)) + ' money in">×</button></div>';
+        return;
+      }
       var it = state.items.filter(function (i) { return i.id === e.item; })[0];
       out += '<div class="entry"><span class="t"><span>' + esc(it ? it.name : 'Removed item') + '</span>' + (e.note ? '<span class="small muted">' + esc(e.note) + '</span>' : '') + '</span><span class="amt">' + rm(e.amt) + '</span><button type="button" class="x" data-ex="' + esc(e.id) + '" aria-label="Delete ' + esc(rm(e.amt)) + ' entry">×</button></div>';
     });
-    $('log').innerHTML = out || '<p class="none">Nothing logged yet. Press + after you spend.</p>';
+    $('log').innerHTML = out || '<p class="none">Nothing logged yet. Press + after you spend or receive money.</p>';
   }
 
   /* Plan */
@@ -282,30 +307,57 @@
   }
 
   /* Add spending */
-  function openSheet() {
-    chosen = null; $('exAmt').value = ''; $('exNote').value = ''; $('exErr').hidden = true;
-    var html = '';
+  function chip(id, label, dot) {
+    return '<button type="button" class="chip" role="radio" aria-checked="' + (chosen === id) + '" data-chip="' + esc(id) + '">' + (dot ? '<span class="dot" style="background:' + dot + '"></span>' : '') + esc(label) + '</button>';
+  }
+  function renderSheet() {
+    var isIn = mode === 'in';
+    $('sheetT').textContent = isIn ? 'Add money in' : 'Add spending';
+    $('mSpend').setAttribute('aria-pressed', !isIn); $('mIn').setAttribute('aria-pressed', isIn);
+    $('kinds').hidden = !isIn;
+    $('kinds').innerHTML = KINDS.map(function (k) {
+      return '<button type="button" class="chip" role="radio" aria-checked="' + (kind === k.id) + '" data-kind="' + k.id + '">' + esc(k.name) + '</button>';
+    }).join('');
+    var k = KINDS.filter(function (x) { return x.id === kind; })[0];
+    $('inHint').hidden = !isIn || !k;
+    $('inHint').textContent = k ? k.hint : '';
+    $('chipsL').textContent = isIn ? 'Where does it go?' : 'Category';
+    var html = isIn ? chip('fund', 'Emergency fund', 'var(--c-save)') + chip('none', 'No budget change', '') : '';
     budgetAccts().forEach(function (a) {
-      state.items.filter(function (it) { return it.acct === a.id && !it.paid && (it.now || 0) > 0; }).forEach(function (it) {
-        html += '<button type="button" class="chip" role="radio" aria-checked="false" data-chip="' + esc(it.id) + '"><span class="dot" style="background:' + color(a) + '"></span>' + esc(it.name) + '</button>';
+      state.items.filter(function (it) { return it.acct === a.id && !it.paid && (isIn || effBudget(it) > 0); }).forEach(function (it) {
+        html += chip(it.id, (isIn ? 'Back to ' : '') + it.name, color(a));
       });
     });
     $('chips').innerHTML = html;
+    $('exSave').textContent = isIn ? 'Add money in' : 'Save';
+  }
+  function openSheet() {
+    chosen = null; kind = null; mode = 'spend';
+    $('exAmt').value = ''; $('exNote').value = ''; $('exErr').hidden = true;
+    renderSheet();
     $('sheet').showModal();
     $('exAmt').focus();
   }
   function pick(id) {
     chosen = id; $('exErr').hidden = true;
-    document.querySelectorAll('.chip').forEach(function (c) { c.setAttribute('aria-checked', c.dataset.chip === id); });
+    $('chips').querySelectorAll('.chip').forEach(function (c) { c.setAttribute('aria-checked', c.dataset.chip === id); });
+    if (mode !== 'spend') return;
     var it = state.items.filter(function (i) { return i.id === id; })[0];
-    if (it && it.fixed && !$('exAmt').value) { var left = r2((it.now || 0) - spentOn(id)); if (left > 0) $('exAmt').value = left; }
+    if (it && it.fixed && !$('exAmt').value) { var left = r2(effBudget(it) - spentOn(id)); if (left > 0) $('exAmt').value = left; }
+  }
+  function pickKind(id) {
+    kind = id; $('exErr').hidden = true;
+    var k = KINDS.filter(function (x) { return x.id === id; })[0];
+    if (k && k.to && !chosen) chosen = k.to;
+    renderSheet();
   }
 
   function rollover() {
     var c = calc('now'), got = num($('nextSal').value) || state.salary, cy = state.cycle, nk = nextKey(cy.key), nnk = nextKey(nk), un = unspentDaily(), extra = $('addLeft').checked ? un : 0;
-    var saved = (state.moves.fund ? Math.max(0, c.savings) : 0) + extra;
+    var saved = (state.moves.fund ? Math.max(0, c.savings) : 0) + extra + incomeTo('fund');
     state.fundBase = r2(state.fundBase + saved);
-    state.history.push({ key: cy.key, saved: r2(saved), spent: totalSpent() });
+    state.history.push({ key: cy.key, saved: r2(saved), spent: totalSpent(), moneyIn: incomeTotal() });
+    state.income = [];
     state.items = state.items.filter(function (it) { return active(it, nk); });
     state.items.forEach(function (it) { it.now = it.month || 0; delete it.paid; });
     var pd = state.payday || 7, s = nk + '-' + pad(pd), e = nnk + '-' + pad(pd);
@@ -320,7 +372,7 @@
     var t = e.target; if (!state) return;
     if (t.dataset.amt) { var it = byId(t.dataset.amt); if (it) { it[view] = num(t.value); save(); renderPlanSummary(); renderHome(); renderSpend(); renderFund(); } }
     else if (t.id === 'salary') { state.salary = num(t.value); save(); renderPlanSummary(); renderFund(); }
-    else if (t.id === 'fundEdit') { state.fundBase = r2(num(t.value) - (state.moves.fund ? Math.max(0, calc('now').savings) : 0)); save(); renderFund(); renderHome(); }
+    else if (t.id === 'fundEdit') { state.fundBase = r2(num(t.value) - (state.moves.fund ? Math.max(0, calc('now').savings) : 0) - incomeTo('fund')); save(); renderFund(); renderHome(); }
   });
   document.addEventListener('change', function (e) {
     var t = e.target;
@@ -344,7 +396,10 @@
     else if (t.dataset.cancel) { adding = null; renderBudget(); renderPlanSummary(); }
     else if (t.dataset.del) { state.items = state.items.filter(function (it) { return it.id !== t.dataset.del; }); save(); renderAll(); }
     else if (t.dataset.ex) { state.expenses = state.expenses.filter(function (x) { return x.id !== t.dataset.ex; }); save(); renderAll(); }
+    else if (t.dataset.in) { state.income = state.income.filter(function (x) { return x.id !== t.dataset.in; }); save(); renderAll(); }
     else if (t.dataset.chip) { pick(t.dataset.chip); }
+    else if (t.dataset.kind) { pickKind(t.dataset.kind); }
+    else if (t.dataset.mode) { if (mode !== t.dataset.mode) { mode = t.dataset.mode; chosen = null; kind = null; $('exErr').hidden = true; renderSheet(); } }
     else if (t.id === 'fab') { openSheet(); }
     else if (t.id === 'sheetX') { $('sheet').close(); }
     else if (t.id === 'nextBtn') { confirming = true; renderHome(); }
@@ -358,11 +413,12 @@
     var f = e.target;
     if (f.id === 'addForm') {
       e.preventDefault();
-      var amt = num($('exAmt').value);
-      if (!chosen) { $('exErr').hidden = false; return; }
+      var amt = num($('exAmt').value), now = Date.now(), note = $('exNote').value.trim();
+      if (mode === 'in' && !kind) { $('exErr').textContent = 'Choose what kind of money it is.'; $('exErr').hidden = false; return; }
+      if (!chosen) { $('exErr').textContent = mode === 'in' ? 'Choose where the money goes.' : 'Choose a category first.'; $('exErr').hidden = false; return; }
       if (!amt) return;
-      var now = Date.now();
-      state.expenses.push({ id: 'e' + now.toString(36), item: chosen, amt: r2(amt), date: todayISO(), ts: now, note: $('exNote').value.trim() });
+      if (mode === 'in') state.income.push({ id: 'i' + now.toString(36), kind: kind, to: chosen, amt: r2(amt), date: todayISO(), ts: now, note: note });
+      else state.expenses.push({ id: 'e' + now.toString(36), item: chosen, amt: r2(amt), date: todayISO(), ts: now, note: note });
       save(); $('sheet').close(); renderAll();
     } else if (f.dataset && f.dataset.add) {
       e.preventDefault();
@@ -405,7 +461,7 @@
   window.addEventListener('resize', function () { if (state && tab === 'fund') renderFund(); });
 
   var saved = load();
-  if (saved && valid(saved)) { saved.expenses = saved.expenses || []; saved.moves = saved.moves || {}; saved.history = saved.history || []; state = saved; }
+  if (saved && valid(saved)) { saved.expenses = saved.expenses || []; saved.income = saved.income || []; saved.moves = saved.moves || {}; saved.history = saved.history || []; state = saved; }
   show();
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(function () {});
 })();
