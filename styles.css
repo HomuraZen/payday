@@ -8,7 +8,7 @@
   --fg: #f1f1f4; --fg-2: #b9b9c2; --fg-3: #8f8f9a;
   --accent: #7b8cde;
   --c-save: #2f9e77; --c-bills: #7b8cde; --c-daily: #bf8218; --c-funds: #c8567f; --c-idle: #8f8f9a;
-  --bad: #f08a7b; --bad-bg: #40231f; --good: #6fd0a8;
+  --bad: #f08a7b; --amber: #e3ad55; --bad-bg: #40231f; --good: #6fd0a8;
   --display: "Bricolage Grotesque", "Trebuchet MS", sans-serif;
   --body: "Instrument Sans", "Segoe UI", system-ui, sans-serif;
   --nav: calc(60px + env(safe-area-inset-bottom, 0px));
@@ -162,3 +162,20 @@ textarea { width: 100%; background: var(--raised); border: 1px solid var(--line)
 .cardrow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 6px 0; }
 .cardrow span { min-width: 0; overflow-wrap: anywhere; }
 select { background: var(--raised); border: 1px solid var(--line); border-radius: 8px; min-height: 42px; padding: 0 8px; font: inherit; font-size: 16px; color: var(--fg); }
+
+.chip .cb { font-size: 12px; color: var(--fg-3); white-space: nowrap; }
+.chip .cb.low { color: var(--amber); } .chip .cb.neg { color: var(--bad); }
+.chip[aria-checked="true"] .cb { color: #55555e; }
+.chip[aria-checked="true"] .cb.low { color: #8a5a00; } .chip[aria-checked="true"] .cb.neg { color: #b42318; }
+.splitbox { display: grid; }
+.sline { display: grid; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.sline select { width: 100%; }
+.srow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.srow .money input { width: 80px; }
+.seg.unit button { min-height: 34px; padding: 4px 10px; }
+.samt { margin-left: auto; font-weight: 600; }
+.sbal { font-size: 13px; color: var(--fg-2); }
+.sbal.low { color: var(--amber); } .sbal.neg { color: var(--bad); }
+.sfoot { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; padding-top: 4px; }
+.sstat { font-weight: 600; } .sstat.ok { color: var(--good); } .sstat.bad { color: var(--bad); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
