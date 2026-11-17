@@ -179,3 +179,6 @@ select { background: var(--raised); border: 1px solid var(--line); border-radius
 .sfoot { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; padding-top: 4px; }
 .sstat { font-weight: 600; } .sstat.ok { color: var(--good); } .sstat.bad { color: var(--bad); }
 .btn:disabled { opacity: .45; cursor: not-allowed; }
+
+.miles li span .muted { margin-left: 0; }
+.miles b.o { color: var(--bad); }
